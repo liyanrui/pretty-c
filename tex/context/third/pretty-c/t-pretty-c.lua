@@ -137,23 +137,23 @@ local grammar = visualizers.newgrammar(
       "visualizer",
 
       ltgtstring = makepattern(handler,"string",P("<")) * V("space")^0
-      * (makepattern(handler,"string",1-patterns.newline-P(">")))^0
+      * (makepattern(handler,"string",patterns.utf8character-patterns.newline-P(">")))^0
    * makepattern(handler,"string",P(">")+patterns.newline),
 
 
       sstring = makepattern(handler,"string",patterns.dquote)
-      * ( V("whitespace") + makepattern(handler,"string",(P("\\")*P(1))+1-patterns.dquote) )^0
+      * ( V("whitespace") + makepattern(handler,"string",(P("\\")*P(1))+patterns.utf8character-patterns.dquote) )^0
       * makepattern(handler,"string",patterns.dquote),
 
       dstring = makepattern(handler,"string",patterns.squote)
-      * ( V("whitespace") + makepattern(handler,"string",(P("\\")*P(1))+1-patterns.squote) )^0
+      * ( V("whitespace") + makepattern(handler,"string",(P("\\")*P(1))+patterns.utf8character-patterns.squote) )^0
       * makepattern(handler,"string",patterns.squote),
 
       comment = makepattern(handler,"comment",comment),
       --       * (V("space") + V("content"))^0,
 
       incomment = makepattern(handler,"comment",incomment_open)
-      * ( V("whitespace") + makepattern(handler,"comment",1-incomment_close) )^0
+      * ( V("whitespace") + makepattern(handler,"comment", patterns.utf8character-incomment_close) )^0
       * makepattern(handler,"comment",incomment_close),
    
       argsep = V("optionalwhitespace") * makepattern(handler,"default",P(",")) * V("optionalwhitespace"),
