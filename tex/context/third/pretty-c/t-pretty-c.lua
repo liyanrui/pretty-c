@@ -122,6 +122,8 @@ local newline     = patterns.newline
 local emptyline   = patterns.emptyline
 local beginline   = patterns.beginline
 local somecontent = patterns.somecontent
+local dquote      = patterns.dquote
+local squote      = patterns.squote
 
 local comment     = P("//") * patterns.space^0 * (1 - patterns.newline)^0
 local incomment_open = P("/*")
@@ -136,57 +138,42 @@ local grammar = visualizers.newgrammar(
    {
       "visualizer",
 
-      ltgtstring = makepattern(handler,"string",P("<")) * V("space")^0
-      * (makepattern(handler,"string",patterns.utf8character-patterns.newline-P(">")))^0
-   * makepattern(handler,"string",P(">")+patterns.newline),
-
-
-      sstring = makepattern(handler,"string",patterns.dquote)
-      * ( V("whitespace") + makepattern(handler,"string",(P("\\")*P(1))+patterns.utf8character-patterns.dquote) )^0
-      * makepattern(handler,"string",patterns.dquote),
-
-      dstring = makepattern(handler,"string",patterns.squote)
-      * ( V("whitespace") + makepattern(handler,"string",(P("\\")*P(1))+patterns.utf8character-patterns.squote) )^0
-      * makepattern(handler,"string",patterns.squote),
+      ltgtstring = makepattern(handler,"string",P("<") * (1 - newline - P(">"))^0 * P(">")),
+      dstring = makepattern(handler, "string", dquote * ((P("\\")*P(1)) + 1 - dquote)^0 * dquote),
+      sstring = makepattern(handler, "string", squote * ((P("\\")*P(1)) + 1 - squote)^0 * squote),
 
       comment = makepattern(handler,"comment",comment),
-      --       * (V("space") + V("content"))^0,
-
-      incomment = makepattern(handler,"comment",incomment_open)
-      * ( V("whitespace") + makepattern(handler,"comment", patterns.utf8character-incomment_close) )^0
-      * makepattern(handler,"comment",incomment_close),
+      incomment = makepattern(handler, "comment", incomment_open * (1-incomment_close)^0 * incomment_close),
    
       argsep = V("optionalwhitespace") * makepattern(handler,"default",P(",")) * V("optionalwhitespace"),
       argumentslist = V("optionalwhitespace") * (makepattern(handler,"name",name) + V("argsep"))^0,
-
+      
       preproc = makepattern(handler,"preproc", P("#")) * V("optionalwhitespace") * makepattern(handler,"preproc", name) * V("whitespace") 
-      * (
-         (makepattern(handler,"boundary", name) * makepattern(handler,"default",P("(")) * V("argumentslist") * makepattern(handler,"default",P(")")))
-         + ((makepattern(handler,"name", name) * (V("space")-V("newline"))^1 ))
-        )^-1,
-
+          * (
+              (makepattern(handler,"boundary", name) * makepattern(handler,"default",P("(")) * V("argumentslist") * makepattern(handler,"default",P(")")))
+                  + ((makepattern(handler,"name", name) * (V("space")-V("newline"))^1 ))
+            )^-1,
+      
       name = (makepattern(handler,"name_c", name) * V("optionalwhitespace") * makepattern(handler,"default",P("(")))
-      + (makepattern(handler,"name_b", name) * V("optionalwhitespace") * makepattern(handler,"default",P("=") + P(";") + P(")") + P(",") ))
-      + makepattern(handler,"name_a",name),
-
-    pattern =
-      V("incomment")
-      + V("comment")
-      + V("ltgtstring")
-      + V("dstring")
-      + V("sstring")
-      + V("preproc")
-      + V("name")
-      + makepattern(handler,"boundary",boundary)
-      + V("space")
-      + V("line")
-      + V("default"),
-
-    visualizer =
-        V("pattern")^1
+          + (makepattern(handler,"name_b", name) * V("optionalwhitespace") * makepattern(handler,"default",P("=") + P(";") + P(")") + P(",") ))
+          + makepattern(handler,"name_a",name),
+      
+      pattern =
+          V("incomment")
+          + V("comment")
+          + V("ltgtstring")
+          + V("dstring")
+          + V("sstring")
+          + V("preproc")
+          + V("name")
+          + makepattern(handler,"boundary",boundary)
+          + V("space")
+          + V("line")
+          + V("default"),
+      
+      visualizer = V("pattern")^1
    }
 )
 
 local parser = P(grammar)
-
 visualizers.register("c", { parser = parser, handler = handler, grammar = grammar } )
