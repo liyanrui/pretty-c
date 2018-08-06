@@ -24,7 +24,7 @@ if not modules then modules = { } end modules ['t-pretty-c'] = {
 }
 
 local tohash = table.tohash
-local P, S, V, patterns = lpeg.P, lpeg.S, lpeg.V, lpeg.patterns
+local P, S, V, patterns, C = lpeg.P, lpeg.S, lpeg.V, lpeg.patterns, lpeg.C
 
 
 local keyword = tohash {
@@ -36,7 +36,7 @@ local keyword = tohash {
 
 local type = tohash {
    "char", "double", "float", "int", "long", "short", "signed", "unsigned",
-   "void",
+   "void", "size_t",
 }
 
 local preproc = tohash {
@@ -53,16 +53,20 @@ local startCSnippet         = context.startCSnippet
 local stopCSnippet          = context.stopCSnippet
 
 local CSnippetBoundary      = verbatim.CSnippetBoundary
-local CSnippetSpecial       = verbatim.CSnippetSpecial
 local CSnippetComment       = verbatim.CSnippetComment
 local CSnippetKeyword       = verbatim.CSnippetKeyword
 local CSnippetType          = verbatim.CSnippetType
 local CSnippetPreproc       = verbatim.CSnippetPreproc
 local CSnippetName          = verbatim.CSnippetName
 local CSnippetString        = verbatim.CSnippetString
+local CSnippetProcName      = verbatim.CSnippetProcName
 
 local typedecl = false
-
+local letter = patterns.letter
+local underscore = patterns.underscore
+local digit = patterns.digit
+local space = patterns.space
+local name = C((letter + underscore) * (letter + underscore + digit)^0)
 local function visualizename_a(s)
    if keyword[s] then
       CSnippetKeyword(s)
@@ -97,6 +101,10 @@ local function visualizename_c(s)
    end
 end
 
+
+local langle = "\\color[darkblue]{\\switchtobodyfont[rm]\\raise.1em\\hbox{$\\langle$}\\,"
+local rangle_equiv = "\\,\\raise.1em\\hbox{$\\rangle\\equiv$}}"
+local rangle = "\\,\\raise.1em\\hbox{$\\rangle$}}"
 local handler = visualizers.newhandler {
     startinline  = function() CSnippet(false,"{") end,
     stopinline   = function() context("}") end,
@@ -104,33 +112,31 @@ local handler = visualizers.newhandler {
     stopdisplay  = function() stopCSnippet() end ,
 
     boundary     = function(s) CSnippetBoundary(s) end,
-    comment      = function(s) CSnippetComment(s) end,
+    comment      = function(s) CSnippetComment(s)  end,
     string       = function(s) CSnippetString(s) end,
     name         = function(s) CSnippetName(s) end,
     type         = function(s) CSnippetType(s) end,
     preproc      = function(s) CSnippetPreproc(s) end,
     varname      = function(s) CSnippetVarName(s) end,
 
+    -- local str = P("@") * P(" ")^0 * lpeg.C((1 - P(" ")^0 * P("#"))^0) * P("#") * P(-1)
+    -- str:match("@ test #")
+    procname     = function(s) context(langle .. string.gsub(s, "^@%s*(.-)%s*#$", "%1") .. rangle_equiv) end,
+    procnameref  = function(s) context(langle .. string.gsub(s, "^#%s*(.-)%s*@$", "%1") .. rangle) end,
+
     name_a       = visualizename_a,
     name_b       = visualizename_b,
     name_c       = visualizename_c,
 }
 
-local space       = patterns.space
-local anything    = patterns.anything
 local newline     = patterns.newline
-local emptyline   = patterns.emptyline
-local beginline   = patterns.beginline
-local somecontent = patterns.somecontent
 local dquote      = patterns.dquote
 local squote      = patterns.squote
 
-local comment     = P("//") * patterns.space^0 * (1 - patterns.newline)^0
+local comment     = P("//") * patterns.space^0 * (1 - newline)^0
 local incomment_open = P("/*")
 local incomment_close = P("*/")
 
-local name        = (patterns.letter + patterns.underscore)
-                  * (patterns.letter + patterns.underscore + patterns.digit)^0
 local boundary    = S('{}')
 
 local grammar = visualizers.newgrammar(
@@ -157,9 +163,14 @@ local grammar = visualizers.newgrammar(
       name = (makepattern(handler,"name_c", name) * V("optionalwhitespace") * makepattern(handler,"default",P("(")))
           + (makepattern(handler,"name_b", name) * V("optionalwhitespace") * makepattern(handler,"default",P("=") + P(";") + P(")") + P(",") ))
           + makepattern(handler,"name_a",name),
+
+      procname = makepattern(handler, "procname", P("@") * (P("\\\\") * space^0 * newline + 1 - P("#") - newline)^0 * P("#")),
+      procnameref = makepattern(handler, "procnameref", P("#") * (P("\\\\") * space^0 * newline + 1 - P("@") - newline)^0 * P("@")),
       
       pattern =
-          V("incomment")
+          V("procname")
+          + V("procnameref")
+          + V("incomment")
           + V("comment")
           + V("ltgtstring")
           + V("dstring")
