@@ -102,9 +102,11 @@ local function visualizename_c(s)
 end
 
 
-local langle = "\\color[darkblue]{\\switchtobodyfont[rm]\\raise.1em\\hbox{$\\langle$}\\,"
-local rangle_equiv = "\\,\\raise.1em\\hbox{$\\rangle\\equiv$}}"
-local rangle = "\\,\\raise.1em\\hbox{$\\rangle$}}"
+local langle = "\\color[darkblue]{\\switchtobodyfont[rm]\\raise.1em\\hbox{$\\langle$}"
+local rangle_equiv = "\\raise.1em\\hbox{$\\rangle\\equiv$}}"
+local rangle = "\\raise.1em\\hbox{$\\rangle$}}"
+local escape_open = "{\\switchtobodyfont[rm]{"
+local escape_close = "}}"
 local handler = visualizers.newhandler {
     startinline  = function() CSnippet(false,"{") end,
     stopinline   = function() context("}") end,
@@ -123,6 +125,7 @@ local handler = visualizers.newhandler {
     -- str:match("@ test #")
     procname     = function(s) context(langle .. string.gsub(s, "^@%s*(.-)%s*#$", "%1") .. rangle_equiv) end,
     procnameref  = function(s) context(langle .. string.gsub(s, "^#%s*(.-)%s*@$", "%1") .. rangle) end,
+    escapearea   = function(s) context(escape_open .. string.gsub(s, "^%[%[%s*(.-)%s*%]%]$", "%1") .. escape_close) end,
 
     name_a       = visualizename_a,
     name_b       = visualizename_b,
@@ -136,9 +139,7 @@ local squote      = patterns.squote
 local comment     = P("//") * patterns.space^0 * (1 - newline)^0
 local incomment_open = P("/*")
 local incomment_close = P("*/")
-
 local boundary    = S('{}')
-
 local grammar = visualizers.newgrammar(
    "default",
    {
@@ -166,10 +167,12 @@ local grammar = visualizers.newgrammar(
 
       procname = makepattern(handler, "procname", P("@") * (P("\\\\") * space^0 * newline + 1 - P("#") - newline)^0 * P("#")),
       procnameref = makepattern(handler, "procnameref", P("#") * (P("\\\\") * space^0 * newline + 1 - P("@") - newline)^0 * P("@")),
+      escapearea = makepattern(handler, "escapearea", P("[[") * (1 - P("]]"))^0 * P("]]")),
       
       pattern =
           V("procname")
           + V("procnameref")
+          + V("escapearea")
           + V("incomment")
           + V("comment")
           + V("ltgtstring")
